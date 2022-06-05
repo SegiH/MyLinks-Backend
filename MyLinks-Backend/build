@@ -1,9 +1,0 @@
-#!/bin/bash
-
-docker build docker/ -t mylinksbackend:latest
-
-docker stop MyLinksBackend && docker rm MyLinksBackend
-
-docker-compose -f mylinksbackend-compose.yml up -d
-
-docker logs MyLinksBackend
