@@ -1,0 +1,332 @@
+openapi: 3.0.0
+info:
+    title: My Links Backend
+    description: My Links Backend API
+    version: 2.0.0
+servers:
+    - url: http://localhost:8080
+      description: MyLinks Backend API Dev
+    - url: https://mylinks-mybackend.mydomain.com
+      description: MyLinks Backend API Prod
+tags:
+     - name: MyLinks
+       description: Links
+     - name: Users
+       description: Users
+     - name: Categories
+       description: Link categories
+paths:
+     /AddCategory:
+          put:
+               tags:
+                    - Categories
+               summary: Add new category
+               description: Add new category
+               parameters:
+                    - name: LinkCategoryName
+                      in: query
+                      description: Category name
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/LinkCategories"
+                    - name: User ID
+                      in: query
+                      description: User ID
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /AddLink:
+          put:
+               tags:
+                    - MyLinks
+               summary: Add new link
+               description: Add new link
+               parameters:
+                    - name: Name
+                      in: query
+                      description: Link name
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: URL
+                      in: query
+                      description: URL of the new link
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: LinkCategoryID
+                      in: query
+                      description: Link Category ID of the link
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: User ID
+                      in: query
+                      description: User ID
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /AddUser:
+          put:
+               tags:
+                    - Users
+               summary: Add new user
+               description: Add new user
+               parameters:
+                    - name: UserName
+                      in: query
+                      description: New user name
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+                    - name: UserDisplayName
+                      in: query
+                      schema:
+                         $ref: "#/components/schemas/Users"
+                      description: User display name
+               responses:
+                    '200':
+                         description: 'No response on success, or an error message if an error occurs or if the user name exists already'
+     /DeleteCategory:
+          put:
+               tags:
+                    - Categories
+               summary: Delete category
+               description: Delete category
+               parameters:
+                    - name: LinkCategoryID
+                      in: query
+                      description: ID of the category to delete
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/LinkCategories"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /DeleteLink:
+          put:
+               tags:
+                    - MyLinks
+               summary: Delete link
+               description: Delete link
+               parameters:
+                    - name: LinkID
+                      in: query
+                      description: ID of the link to delete
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /DeleteUser:
+          put:
+               tags:
+                    - Users
+               summary: Delete User ID
+               description: Delete User ID
+               parameters:
+                    - name: UserID
+                      in: query
+                      description: User ID to delete
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /GetCategories:
+          get:
+               tags:
+                    - Categories
+               summary: Get all link categories for a given user ID
+               description: Users can have custom categories. If the current user has at least 1 custom category, all custom categories for that user will be returned. Otherwise all rows where UserID IS NULL will be returned
+               parameters:
+                    - name: UserID
+                      in: query
+                      description: User ID of the user to get the categories for
+                      schema:
+                         $ref: "#/components/schemas/LinkCategories"
+               responses:
+                    '200':
+                         description: Return link categories
+     /GetLinks:
+          get:
+               tags:
+                    - MyLinks
+               summary: Get all links for a given user
+               description: Get all links for a given user
+               parameters:
+                    - name: UserID
+                      in: query
+                      description: User ID to get the links for
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+               responses:
+                    '200':
+                         description: Returns links
+     /GetUsers:
+          get:
+               tags:
+                    - Users
+               summary: Get all Users
+               description: Get all Users
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /GetUserName:
+          get:
+               tags:
+                    - Users
+               summary: Get User name based on user ID 
+               description: Get User name based on user ID
+               parameters:
+                    - name: UserID
+                      in: query
+                      description: User ID of the user to get the name of
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+               responses:
+                    '200':
+                         description: User name on success, error message otherwise
+     /UpdateCategory:
+          put:
+               tags:
+                    - Categories
+               summary: Update existing category
+               description: Update existing category
+               parameters:
+                    - name: LinkCategoryID
+                      in: query
+                      description: ID of the category to update
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/LinkCategories"
+                    - name: LinkCategoryName
+                      in: query
+                      description: New name of the category
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/LinkCategories"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /UpdateLink:
+          put:
+               tags:
+                    - MyLinks
+               summary: Update link for a given user
+               description: Update link for a given user
+               parameters:
+                    - name: LinkID
+                      in: query
+                      description: ID of the link to update
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: Name
+                      in: query
+                      description: New name of the link
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: URL
+                      in: query
+                      description: New URL
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+                    - name: LinkCategoryID
+                      in: query
+                      description: New Link Category ID of the link
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/MyLinks"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+     /UpdateUsers:
+          put:
+               tags:
+                    - Users
+               summary: Update name and display name a given user
+               description: Update name and display name a given user
+               parameters:
+                    - name: UserID
+                      in: query
+                      description: ID of the user to update
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+                    - name: UserName
+                      in: query
+                      description: New user name
+                      required: true
+                      schema:
+                         $ref: "#/components/schemas/Users"
+                    - name: UserDisplayName
+                      in: query
+                      description: New display name
+                      schema:
+                         $ref: "#/components/schemas/Users"
+               responses:
+                    '200':
+                         description: '["OK",""] on success, ["ERROR","error message"] on error'
+components:
+     securitySchemes:
+          bearerAuth:
+               type: http
+               scheme: bearer
+               bearerFormat: JWT
+     schemas:
+          MyLinks:
+               required:
+                    - LinkID
+                    - Name
+                    - URL
+                    - LinkCategoryID
+                    - UserID
+               properties:
+                    LinkID:
+                         type: integer
+                    Name:
+                         type: string
+                    URL:
+                         type: string
+                    LinkCategoryID:
+                         type: integer
+                    UserID:
+                         type: integer
+          Users:
+               required:
+                    - UserID
+                    - UserName
+               properties:
+                    UserID:
+                         type: integer
+                    UserName:
+                         type: string
+                    UserDisplayName:
+                         type: string
+          LinkCategories:
+               required:
+                    - LinkCategoryID
+                    - LinkCategoryName
+               properties:
+                    LinkCategoryID:
+                         type: integer
+                    LinkCategoryName:
+                         type: string
+                    UserID:
+                         type: integer
+security: [
+     { bearerAuth: [] }
+]

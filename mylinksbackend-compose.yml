@@ -1,0 +1,23 @@
+version: '3.7'
+
+networks:
+     default:
+          name: NETWORKNAME
+          external: true
+
+services:
+     MyLinksBackend:
+          container_name: MyLinksBackend
+          stdin_open: true
+          tty: true
+          image: mylinksbackend:latest
+          hostname: MyLinksBackend
+          environment:
+               - AUTH_KEY=YOUR_AUTH_KEY
+               - MyLinksBackend_User=DB_USERNAME
+               - MyLinksBackend_Password=DB_PASSWORD
+               - MyLinksBackend_Host=DB_HOST
+               - MyLinksBackend_DB=DB_NAME
+          networks: 
+               - default
+         restart: always
