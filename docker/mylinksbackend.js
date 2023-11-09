@@ -2,11 +2,14 @@
 
 const backend="SQLServer";
 const bodyParser = require('body-parser');
-const Connection = require('tedious').Connection;
+//const Connection = require('tedious').Connection;
+const cors = require('cors');
 const express = require('express');
 const fs = require("fs");
 const path = require('path');
-const Request = require('tedious').Request;
+//const Request = require('tedious').Request;
+const request = require("request");
+const { Sequelize, Op } = require("sequelize");
 const sql = require('mssql');
 const swaggerUi = require("swagger-ui-express");
 const util = require('util');
@@ -18,7 +21,14 @@ const swaggerDocument = YAML.load("./swagger.yml");
 const PORT = 8080;
 const HOST = '0.0.0.0';
 const AUTH_KEY=process.env.AUTH_KEY;
+const DBType = "MSSQL";
+const DBFile = "mylinksdb.sqlite";
 
+const corsOptions = {
+     origin: ["http://localhost"],
+     optionsSuccessStatus: 200,
+     credentials: true
+}
 const config = {
      user: process.env.MyLinksBackend_User,
      password: process.env.MyLinksBackend_Password,
@@ -53,7 +63,54 @@ if (typeof config.database === 'undefined') {
           process.exit(1);
 }
 
+// SQLite
+
+/*const SQLiteSequelize = new Sequelize("DBName", "username", "password", {
+  dialect: "sqlite",
+  // we will be saving our db as a file on this path
+  storage: DBFile, // or ':memory:'
+  logging: false
+});*/
+
+const sequelize = new Sequelize(config.database, config.user, config.password, {
+  host: config.server,
+  encrypt: false,
+  dialect: "mssql",
+  logging: false,
+  quoteIdentifiers: true,
+  define: {
+    freezeTableName: true,
+  },
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  },
+  dialectOptions: {
+    port: 1433,
+  },
+});
+
+if (DBType === "MSSQL") {
+  (async () => {
+    try {
+      await sequelize.authenticate();
+
+    } catch (e) {
+      console.log(`Sequelize encountered the error ${e.message} while connecting to the DB`);
+      process.exit(0);
+    }
+  })();
+}
+
+const initModels = require("./models/init-models");
+const models = initModels(sequelize);
+//const models = initModels(DBType === "SQLite" ? SQLiteSequelize : MSSQLSequelize);
+//const sequelize = DBType === "SQLite" ? SQLiteSequelize : MSSQLSequelize;
+
 const app = express();
+app.use(cors(corsOptions));
 
 // Middleware that is called before any endpoint is reached
 app.use(function (req, res, next) {
@@ -106,215 +163,469 @@ app.get('/', (req, res) => {
      res.status(403).send('Unauthorized');
 });
 
-app.put('/AddCategory', (req, res) => {
+app.put('/AddCategory', async (req, res) => {
      const linkCategoryName=(typeof req.query.LinkCategoryName !== 'undefined' ? req.query.LinkCategoryName : null);
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
     
      if (linkCategoryName === null)
           res.send(["Link category name was not provided"]);
      else {
-          let params = [['LinkCategoryName',sql.VarChar,linkCategoryName],["UserID",sql.Int,userID]];
+          await models.LinkCategories.create({
+               LinkCategoryName: linkCategoryName,
+          })
+          .then((result) => {
+               // Return ID of newly inserted row
+               res.send(["OK", result.LinkCategoryID]);
+               return;
+          })
+         .catch(function (e) {
+             const errorMsg = `/AddCategory: The error ${e.message} occurred while adding the Category`;
+             console.error(errorMsg);
+             res.send(["ERROR", errorMsg]);
+             return;
+          });
+          /*let params = [['LinkCategoryName',sql.VarChar,linkCategoryName],["UserID",sql.Int,userID]];
 
           let columns=`LinkCategoryName,UserID`;
           let values = `@LinkCategoryName,@UserID`;
 
           const SQL=`INSERT INTO LinkCategories (${columns}) VALUES(${values})`;          
 		  
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-app.put('/AddLink', (req, res) => {
+app.put('/AddLink', async (req, res) => {
      const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
      const url=(typeof req.query.URL !== 'undefined' ? req.query.URL : null);
      const linkCategoryID=(typeof req.query.LinkCategoryID !== 'undefined' ? req.query.LinkCategoryID : null);
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
     
-     if (name === null)
+     if (name === null) {
           res.send(["Name was not provided"]);
-     else if (url === null)
+          return;
+     } else if (url === null) {
           res.send(["URL was not provided"]);
-     else if (linkCategoryID === null)
+          return;
+     } else if (linkCategoryID === null) {
           res.send(["Link Category ID was not provided"]);
-     else if (userID === null)
+          return;
+     } else if (userID === null) {
           res.send(["User ID was not provided"]);
-     else {
-          let params = [['Name',sql.VarChar,name],["URL",sql.VarChar,url],["LinkCategoryID",sql.Int,linkCategoryID],["UserID",sql.Int,userID]];
+          return;
+     } else {
+          await models.MyLinks.create({
+               Name: name,
+               URL: url,
+               LinkCategoryID: linkCategoryID,
+               UserID: userID
+          })
+          .then((result) => {
+               // Return ID of newly inserted row
+               res.send(["OK", result.LinkID]);
+               return;
+          })
+         .catch(function (e) {
+             const errorMsg = `/AddLink: The error ${e.message} occurred while adding the Link`;
+             console.error(errorMsg);
+             res.send(["ERROR", errorMsg]);
+             return;
+          });
+          /*let params = [['Name',sql.VarChar,name],["URL",sql.VarChar,url],["LinkCategoryID",sql.Int,linkCategoryID],["UserID",sql.Int,userID]];
 
           let columns=`Name,URL,LinkCategoryID,UserID`;
           let values = `@Name,@URL,@LinkCategoryID,@UserID`;
 
-          const SQL=`INSERT INTO MyLinks (${columns}) VALUES(${values})`;          
+          const SQL=`INSERT INTO MyLinks (${columns}) VALUES(${values})`;*/
           //const SQL=`INSERT INTO LinkCategories (${columns}) VALUES(${values})`;          
            //		  const SQL=`IF NOT EXISTS (SELECT * FROM LinkCategories WHERE LinkCategoryName=@LinkCategoryName) INSERT INTO LinkCategories (${columns}) VALUES(${values}) ELSE SELECT 'Category name exists already' AS Error`;
 		  
-          execSQL(res,SQL,params,true);
+          //execSQL(res,SQL,params,true);
      }
 });
 
-app.put('/AddUser', (req, res) => {
+app.put('/AddUser', async (req, res) => {
      const userName=(typeof req.query.UserName !== 'undefined' ? req.query.UserName : null);
      const userDisplayName=(typeof req.query.UserDisplayName !== 'undefined' ? req.query.UserDisplayName : null);
     
-     if (userName === null)
-          res.send(["UserName was not provided"]);
-     else {
-          let params = [['UserName',sql.VarChar,userName],['UserDisplayName',sql.VarChar,userDisplayName]];
+     if (userName === null) {
+          res.send(["UserName was not provided"]);a
+          return;
+     } else {
+          await models.Users.create({
+               UserName: userName,
+               UserDisplayName: userDisplayName,
+               Enabled: true
+          })
+          .then((result) => {
+               // Return ID of newly inserted row
+               res.send(["OK", result.UserID]);
+               return;
+          })
+         .catch(function (e) {
+             const errorMsg = `/AddUser: The error ${e.message} occurred while adding the User`;
+             console.error(errorMsg);
+             res.send(["ERROR", errorMsg]);
+             return;
+          });
+          /*let params = [['UserName',sql.VarChar,userName],['UserDisplayName',sql.VarChar,userDisplayName]];
 
           let columns=`UserName,UserDisplayName`;
           let values = `@UserName,@UserDisplayName`;
 
           const SQL=`IF NOT EXISTS (SELECT * FROM Users WHERE UserName=@UserName) INSERT INTO Users (${columns}) VALUES (${values}) ELSE SELECT 'User name exists already' AS Error`;
 
-          execSQL(res,SQL,params,true);
+          execSQL(res,SQL,params,true);*/
      }
 });
 
-app.put('/DeleteCategory', (req, res) => {
+app.put('/DeleteCategory', async (req, res) => {
      const linkCategoryID=(typeof req.query.LinkCategoryID !== 'undefined' ? req.query.LinkCategoryID : null);
 
-     if (linkCategoryID === null)
+     if (linkCategoryID === null) {
           res.send(["Link category ID was not provided"]);
-     else {
-          let params = [['LinkCategoryID',sql.Int,linkCategoryID]];
+          return;
+     } else {
+          const inUseValidation = await models.MyLinks.findOne({
+               where: {
+                    LinkCategoryID: linkCategoryID,
+               }
+          });
+
+          if (inUseValidation != null) {
+               res.send(["ERROR","Category is assigned to at least 1 link"]);
+               return;
+          } else {
+               await LinkCategories.destroy({
+                    where: {
+                         LinkCategoryID: linkCategoryID
+                    },
+               });
+          }
+
+          /*let params = [['LinkCategoryID',sql.Int,linkCategoryID]];
 
           const SQL=`IF NOT EXISTS (SELECT * FROM MyLinks WHERE LinkCategoryID=@LinkCategoryID) DELETE FROM LinkCategories WHERE LinkCategoryID=@LinkCategoryID ELSE SELECT 'Category is assigned to at least 1 link' AS Error`
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-app.put('/DeleteLink', (req, res) => {
+app.put('/DeleteLink', async (req, res) => {
      const linkID=(typeof req.query.LinkID !== 'undefined' ? req.query.LinkID : null);
 
      if (linkID === null)
           res.send(["LinkID was not provided"]);
      else {
-          let params = [['LinkID',sql.Int,linkID]];
+          await MyLinks.destroy({
+               where: {
+                    LinkID: linkID
+               },
+          }) 
+          .then((result) => {
+               res.send(["OK", ""]);
+               return;
+          })
+         .catch(function (e) {
+             const errorMsg = `/DeleteLink: The error ${e.message} occurred while deleting the link`;
+             console.error(errorMsg);
+             res.send(["ERROR", errorMsg]);
+             return;
+          });
+          /*let params = [['LinkID',sql.Int,linkID]];
 
           const SQL=`DELETE FROM MyLinks WHERE LinkID=@LinkID`;
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-app.put('/DeleteUser', (req, res) => {
+app.put('/DeleteUser', async (req, res) => {
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
     
-     if (userID === null)
+     if (userID === null) {
           res.send(["User ID was not provided"]);
-     else {
-          let params = [['UserID',sql.Int,userID]];
+          return;
+     } else {
+          const inUseValidation = await models.MyLinks.findOne({
+               where: {
+                    UserID: userID,
+               }
+          });
+
+          if (inUseValidation != null) {
+               res.send(["ERROR","User has at least 1 link assigned to it"]);
+               return;i
+          }
+          
+          await Users.destroy({
+               where: {
+                    UserID: userID
+               },
+          })
+          .then((result) => {
+               res.send(["OK", ""]);
+               return;
+          })
+          .catch(function (e) {
+               const errorMsg = `/DeleteUser: The error ${e.message} occurred while deleting the user`;
+               console.error(errorMsg);
+               res.send(["ERROR", errorMsg]);
+               return;
+          });
+     }
+          /*let params = [['LinkID',sql.Int,linkID]];
+               
+           }
+         /*await Users.destroy({
+               where: {
+                    UserID: {
+                         [Op.or]: [null,userID]
+                    }
+               },
+          });*/
+          /*let params = [['UserID',sql.Int,userID]];
 
 	  const SQL=`IF NOT EXISTS (SELECT * FROM MyLinks WHERE UserID=@UserID) DELETE FROM Users WHERE UserID=@UserID ELSE SELECT 'User has at least 1 link assigned to it' AS Error`
 
-          execSQL(res,SQL,params,true);
-     }
+          execSQL(res,SQL,params,true);*/
 });
 
 app.get('/GetCategories', (req, res) => {
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);     
      
-     // Users can have custom categories. If the current user has at least 1 custom category, all custom categories for that user will be returned. Otherwise all rows where UserID IS NULL will be returned
-     const SQL=`IF EXISTS (SELECT * FROM LinkCategories WHERE UserID=${userID}) SELECT * FROM LinkCategories WHERE UserID=${userID} ORDER BY LinkCategoryName ELSE SELECT * FROM LinkCategories WHERE UserID IS NULL ORDER BY LinkCategoryName `;
+     models.LinkCategories.findAll({
+          where: {
+               UserID: {
+                    [Op.or]: [null,userID]
+               }
+          }
+    })
+    .then((results) => {
+         res.send(results);
+         return;
+    })
+    .catch(function (err) {
+         res.send(["ERROR", `/GetCategories: The error ${err} occurred getting the categories`]);
+         return;
+    });
+      
+     /*const SQL=`IF EXISTS (SELECT * FROM LinkCategories WHERE UserID=${userID}) SELECT * FROM LinkCategories WHERE UserID=${userID} ORDER BY LinkCategoryName ELSE SELECT * FROM LinkCategories WHERE UserID IS NULL ORDER BY LinkCategoryName `;
 
-     execSQL(res,SQL,null,true);
+     execSQL(res,SQL,null,true);*/
 });
 
 app.get('/GetLinks', (req, res) => {
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);     
      
-     if (userID === null)
+     if (userID === null) {
           res.send(["User ID was not provided"]);
-     else {
-          const SQL=`SELECT MyLinks.*,LinkCategories.LinkCategoryName FROM MyLinks LEFT JOIN LinkCategories ON LinkCategories.LinkCategoryID=MyLinks.LinkCategoryID WHERE MyLinks.UserID=${userID} ORDER BY Name`;
+          return;
+     } else {
+          models.LinkCategories.hasMany(models.MyLinks, {
+               foreignKey: "LinkCategoryID",
+          });
+     
+          models.MyLinks.belongsTo(models.LinkCategories, {
+               foreignKey: "LinkCategoryID",
+          });
 
-          execSQL(res,SQL,null,true);
+          models.MyLinks.findAll({
+               where: {
+                    UserID: userID
+               },
+               include: [
+                    {
+                         model: models.LinkCategories,
+                         required: true,
+                    },
+               ],
+               order: [
+                    ["Name"]
+               ]
+          })
+          .then((results) => {
+               res.send(results);
+               return;
+          })
+          .catch(function (err) {
+               res.send(["ERROR", `/GetLinks: The error ${err} occurred getting the links`]);
+               return;
+          });
+          /*const SQL=`SELECT MyLinks.*,LinkCategories.LinkCategoryName FROM MyLinks LEFT JOIN LinkCategories ON LinkCategories.LinkCategoryID=MyLinks.LinkCategoryID WHERE MyLinks.UserID=${userID} ORDER BY Name`;
+
+          execSQL(res,SQL,null,true);*/
+
      }
 });
 
 app.get('/GetUsers', (req, res) => {
-     const SQL=`SELECT * FROM Users ORDER BY UserName`;
+     models.Users.findAll({
+          where: { 
+                Enabled: true
+          },
+          order: [
+               ["UserName"]
+               ]
+          })
+          .then((results) => {
+               res.send(results);
+               return;
+          })
+          .catch(function (err) {
+               res.send(["ERROR", `/GetLinks: The error ${err} occurred getting the links`]);
+               return;
+          });
+     
+     /*const SQL=`SELECT * FROM Users ORDER BY UserName`;
 
-     execSQL(res,SQL,null,true);
+     execSQL(res,SQL,null,true);*/
 });
 
 app.get('/GetUserName', (req, res) => {
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
     
-     if (userID === null)
+     if (userID === null) {
           res.send(["User ID was not provided"]);
-     else {
-          let params = [['UserID',sql.Int,userID]];
+          return;
+     } else {
+          models.Users.findAll({
+               attributes: ['UserName'],
+               where: {
+                    UserID: userID
+               },
+          })
+          .then((results) => {
+               res.send(results);
+               return;
+          })
+          .catch(function (err) {
+               res.send(["ERROR", `/GetUserName: The error ${err} occurred getting the username`]);
+               return;
+          });
+          /*let params = [['UserID',sql.Int,userID]];
 
           const SQL=`SELECT UserName FROM Users WHERE UserID=@UserID`;
 
-          execSQL(res,SQL,params,true);
+          execSQL(res,SQL,params,true);*/
      }
 });
 
-app.put('/UpdateCategory', (req, res) => {
+app.put('/UpdateCategory', async (req, res) => {
      const linkCategoryID=(typeof req.query.LinkCategoryID !== 'undefined' ? req.query.LinkCategoryID : null);
      const linkCategoryName=(typeof req.query.LinkCategoryName !== 'undefined' ? req.query.LinkCategoryName : null);
 	
-     if (linkCategoryID === null)
+     if (linkCategoryID === null) {
           res.send(["Link category ID was not provided"]);
-     else if (linkCategoryName === null)
+          return;
+     } else if (linkCategoryName === null) {
           res.send(["Link category name was not provided"]);
-     else {
-          let params = [['LinkCategoryID',sql.Int,linkCategoryID],['LinkCategoryName',sql.VarChar,linkCategoryName]];
+          return;
+     } else {
+          const updatedRowCount = await models.LinkCategories.update(
+               {LinkCategoryName: linkCategoryName}
+          ,{
+               where: { LinkCategoryID: linkCategoryID}
+          }).catch(function (e) {
+               const errorMsg = `/UpdateCategory: The error ${e.message} occurred while updatingi the Link Category with ID ${linkCategoryID}`;
+               res.send(["ERROR", errorMsg]);
+               return;
+          });
+
+          res.send(["OK", updatedRowCount]);
+          return;
+          /*let params = [['LinkCategoryID',sql.Int,linkCategoryID],['LinkCategoryName',sql.VarChar,linkCategoryName]];
 
           const SQL=`UPDATE Categories SET LinkCategoryName=@LinkCategoryName WHERE LinkCategoryID=@LinkCategoryID`;
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-app.put('/UpdateLink', (req, res) => {
+app.put('/UpdateLink', async (req, res) => {
      const linkID=(typeof req.query.LinkID !== 'undefined' ? req.query.LinkID : null);
      const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
      const url=(typeof req.query.URL !== 'undefined' ? req.query.URL : null);
      const linkCategoryID=(typeof req.query.LinkCategoryID !== 'undefined' ? req.query.LinkCategoryID : null);
     
-     if (linkID === null)
+     if (linkID === null) {
           res.send(["LinkID was not provided"]);
-     else if (name === null)
+          return;
+     } else if (name === null) {
           res.send(["Name was not provided"]);
-     else if (url === null)
+          return;
+     } else if (url === null) {
           res.send(["URL was not provided"]);
-     else if (linkCategoryID === null)
+          return;
+     } else if (linkCategoryID === null) {
           res.send(["Link Category ID was not provided"]);
-     else {
-          let params = [['LinkID',sql.Int,linkID],['Name',sql.VarChar,name],["URL",sql.VarChar,url],["LinkCategoryID",sql.Int,linkCategoryID]];
+          return;
+     } else {
+          const updatedRowCount = await models.MyLinks.update(
+               {Name: name},
+               {URL: url},
+               {LinkCategoryID: linkCategoryID}
+          ,{
+               where: { 
+                    LinkID: linkID
+               }
+          }).catch(function (e) {
+               const errorMsg = `/UpdateLink: The error ${e.message} occurred while updating the link with ID ${linkID}`;
+               res.send(["ERROR", errorMsg]);
+               return;
+          });
+
+          res.send(["OK", updatedRowCount]);
+          return;
+          /*let params = [['LinkID',sql.Int,linkID],['Name',sql.VarChar,name],["URL",sql.VarChar,url],["LinkCategoryID",sql.Int,linkCategoryID]];
 
           let columns=`LinkID,Name,URL,LinkCategoryID`;
           let values = `@LinkID,@Name,@URL,@LinkCategoryID`;
 
           const SQL=`UPDATE MyLinks SET Name=@Name,URL=@URL,LinkCategoryID=@LinkCategoryID WHERE LinkID=@LinkID`
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-app.put('/UpdateUsers', (req, res) => {
+app.put('/UpdateUsers', async (req, res) => {
      const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
      const userName=(typeof req.query.UserName !== 'undefined' ? req.query.UserName : null);
      const userDisplayName=(typeof req.query.UserDisplayName !== 'undefined' ? req.query.UserDisplayName : null);
+     const enabled=(typeof req.query.Enabled !== 'undefined' && req.query.Enabled === "true" ? true : false);
 
-     if (userID === null)
+     if (userID === null) {
           res.send(["User ID was not provided"]);
-     else if (userName === null)
+          return;
+     } else if (userName === null) {
           res.send(["UserName was not provided"]);
-     else {
-          let params = [['UserID',sql.Int,userID],['UserName',sql.VarChar,userName],['UserDisplayName',sql.VarChar,userDisplayName]];
+          return;
+     } else {
+          const updatedRowCount = await models.Users.update(
+               {UserName: userName},
+               {UserDisplayName: userDisplayName},
+               {Enabled: enabled}
+          ,{
+               where: { 
+                    UserID: userID
+               }
+          }).catch(function (e) {
+               const errorMsg = `/UpdateUsers: The error ${e.message} occurred while updating the users with ID ${userID}`;
+               res.send(["ERROR", errorMsg]);
+               return;
+          });
+
+          res.send(["OK", updatedRowCount]);
+          return;
+          /*let params = [['UserID',sql.Int,userID],['UserName',sql.VarChar,userName],['UserDisplayName',sql.VarChar,userDisplayName]];
 
           const SQL=`UPDATE Users SET UserName=@UserName,UserDisplayName=@UserDisplayName WHERE UserID=@UserID`
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,false);*/
      }
 });
 
-function execSQL(res,SQL,params,returnsData) {
+/*function execSQL(res,SQL,params,returnsData) {
      try {
           var connection = new Connection(config);
 
@@ -350,7 +661,7 @@ function execSQL(res,SQL,params,returnsData) {
           console.log("Error!");
           res.send("Error is " + e);
      }
-}
+}*/
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);

@@ -6,7 +6,7 @@ info:
 servers:
     - url: http://localhost:8080
       description: MyLinks Backend API Dev
-    - url: https://mylinks-mybackend.mydomain.com
+    - url: https://mylinks-backend.hovav.org
       description: MyLinks Backend API Prod
 tags:
      - name: MyLinks
@@ -316,6 +316,8 @@ components:
                          type: string
                     UserDisplayName:
                          type: string
+                    Enabled:
+                         type: boolean
           LinkCategories:
                required:
                     - LinkCategoryID
